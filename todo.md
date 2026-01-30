@@ -8,18 +8,18 @@
 - [x] Initialize git repository
 - [x] Create todo.md file
 
-## Phase 1: Backend Foundation
-- [ ] Set up FastAPI application structure
-- [ ] Configure PostgreSQL database connection
-- [ ] Create database models (SQLAlchemy)
-  - [ ] Users table
-  - [ ] Workspaces table
-  - [ ] Suppliers table
-  - [ ] Invoices table
-  - [ ] Pending documents table
-  - [ ] Processed emails table
-- [ ] Set up Alembic for database migrations
-- [ ] Create initial migration
+## Phase 1: Backend Foundation ✅
+- [x] Set up FastAPI application structure
+- [x] Configure PostgreSQL database connection
+- [x] Create database models (SQLAlchemy)
+  - [x] Users table
+  - [x] Workspaces table
+  - [x] Suppliers table
+  - [x] Invoices table
+  - [x] Pending documents table
+  - [x] Processed emails table
+- [x] Set up Alembic for database migrations
+- [x] Create initial migration
 
 ## Phase 2: Authentication
 - [ ] Implement Google OAuth flow
@@ -113,5 +113,5 @@
 
 ---
 
-**Current Phase:** Project Setup
+**Current Phase:** Phase 2: Authentication
 **Last Updated:** 2026-01-30
