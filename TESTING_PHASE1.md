@@ -62,11 +62,17 @@ choco install postgresql
 Open Git Bash and run:
 
 ```bash
+# Add PostgreSQL to PATH (required for psql commands)
+# Replace "18" with your PostgreSQL version (16, 17, or 18)
+export PATH=$PATH:"/c/Program Files/PostgreSQL/18/bin"
+
 # Check if PostgreSQL is running
 psql --version
 ```
 
-You should see something like: `psql (PostgreSQL) 16.x`
+You should see something like: `psql (PostgreSQL) 18.x`
+
+**Note:** You'll need to run the `export PATH` command each time you open a new Git Bash terminal. To make it permanent, see the "Make PATH Permanent" section below.
 
 ---
 
@@ -96,6 +102,9 @@ We need to create a database called `invoice_db` for our app.
 Open Git Bash and run:
 
 ```bash
+# Add PostgreSQL to PATH first (if not done already)
+export PATH=$PATH:"/c/Program Files/PostgreSQL/18/bin"
+
 # Connect to PostgreSQL (will prompt for password)
 psql -U postgres
 
@@ -307,11 +316,38 @@ psql -U postgres -d invoice_db
 
 PostgreSQL command-line tools aren't in your PATH.
 
-**Fix:**
-Add PostgreSQL to your PATH:
-1. Find the PostgreSQL bin directory: `C:\Program Files\PostgreSQL\16\bin`
-2. Add to Windows PATH environment variable
-3. Restart Git Bash
+**Quick Fix (Git Bash):**
+Add this command before using psql (replace 18 with your version):
+```bash
+export PATH=$PATH:"/c/Program Files/PostgreSQL/18/bin"
+```
+
+**Permanent Fix:**
+Add PostgreSQL to your PATH permanently:
+
+1. **Find your PostgreSQL version:**
+   - Check `C:\Program Files\PostgreSQL\` and note the version number (16, 17, or 18)
+
+2. **For Git Bash (recommended):**
+   - Edit (or create) `~/.bashrc` file:
+   ```bash
+   nano ~/.bashrc
+   ```
+   - Add this line at the end:
+   ```bash
+   export PATH=$PATH:"/c/Program Files/PostgreSQL/18/bin"
+   ```
+   - Save (Ctrl+O, Enter, Ctrl+X)
+   - Reload: `source ~/.bashrc`
+
+3. **For Windows System PATH:**
+   - Press `Win + X` → System → Advanced system settings
+   - Click "Environment Variables"
+   - Under "System variables", find and select "Path"
+   - Click "Edit" → "New"
+   - Add: `C:\Program Files\PostgreSQL\18\bin`
+   - Click OK on all dialogs
+   - Restart Git Bash
 
 **Alternative:** Use pgAdmin for all database operations (graphical interface).
 

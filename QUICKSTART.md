@@ -10,7 +10,7 @@ This is a condensed version of the testing process. For detailed explanations, s
 
 ## Step 2: Create Database
 
-### Using pgAdmin (Easy)
+### Using pgAdmin (Easy - Recommended)
 1. Open pgAdmin 4
 2. Right-click "Databases" → Create → Database
 3. Name: `invoice_db`
@@ -18,6 +18,10 @@ This is a condensed version of the testing process. For detailed explanations, s
 
 ### Using Command Line
 ```bash
+# Add PostgreSQL to PATH first (replace 18 with your version)
+export PATH=$PATH:"/c/Program Files/PostgreSQL/18/bin"
+
+# Create database
 psql -U postgres
 CREATE DATABASE invoice_db;
 \q
@@ -106,6 +110,13 @@ If all tests pass, Phase 1 is complete.
 ---
 
 ## Common Issues
+
+**"psql: command not found"**
+- Add PostgreSQL to PATH:
+  ```bash
+  export PATH=$PATH:"/c/Program Files/PostgreSQL/18/bin"
+  ```
+- Or use pgAdmin instead (graphical interface)
 
 **"command not found"**
 - Make sure you're in the `backend` directory
