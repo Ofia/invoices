@@ -37,11 +37,11 @@ Rules:
 - Return ONLY valid JSON, no explanations
 
 Response format (JSON only):
-{
+{{
   "supplier_email": "billing@company.com",
   "invoice_date": "2025-12-10",
   "total_amount": 100.00
-}
+}}
 
 Invoice text:
 ---
@@ -83,7 +83,7 @@ async def extract_invoice_data(document_text: str) -> Dict[str, Any]:
 
         # Call Claude API
         message = client.messages.create(
-            model="claude-3-5-sonnet-20241022",  # Latest Sonnet model
+            model="claude-sonnet-4-20250514",  # Claude Sonnet 4.5 (latest)
             max_tokens=1024,
             temperature=0,  # Deterministic output for data extraction
             messages=[
@@ -96,7 +96,7 @@ async def extract_invoice_data(document_text: str) -> Dict[str, Any]:
 
         # Extract text response
         response_text = message.content[0].text
-        logger.info(f"Claude response: {response_text[:200]}")
+        logger.info(f"Claude extraction response received ({len(response_text)} chars)")
 
         # Parse JSON response
         try:

@@ -30,7 +30,7 @@ from app.api.dependencies import get_current_user
 from app.api.schemas import PendingDocumentResponse
 from app.models.user import User
 from app.models.workspace import Workspace
-from app.models.pending_document import PendingDocument, DocumentStatus
+from app.models.pending_document import PendingDocument
 from app.models.supplier import Supplier
 from app.models.invoice import Invoice
 from app.utils.storage import save_document_file, delete_document_file, get_document_full_path
@@ -140,7 +140,7 @@ async def upload_document(
         workspace_id=workspace_id,
         filename=file.filename,
         pdf_url=file_path,  # Still called pdf_url in DB but stores any file type
-        status=DocumentStatus.PENDING
+        status="pending"
     )
 
     db.add(document)
@@ -158,8 +158,8 @@ async def upload_document(
 @router.get("/", response_model=list[PendingDocumentResponse])
 async def list_documents(
     workspace_id: int = Query(..., description="Workspace ID to filter documents"),
-    status_filter: DocumentStatus = Query(
-        DocumentStatus.PENDING,
+    status_filter: str = Query(
+        "pending",
         description="Filter by status (pending, processed, rejected)"
     ),
     current_user: User = Depends(get_current_user),
@@ -248,7 +248,7 @@ async def process_document(
         )
 
     # Check if already processed
-    if document.status != DocumentStatus.PENDING:
+    if document.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Document already {document.status.value}"
@@ -275,6 +275,7 @@ async def process_document(
 
     # Step 2: Extract invoice data using AI
     try:
+        logger.info("Calling Claude AI for data extraction")
         extracted_data = await extract_invoice_data(document_text)
         logger.info(f"AI extracted data: {extracted_data}")
 
@@ -329,7 +330,7 @@ async def process_document(
     db.add(invoice)
 
     # Step 7: Update document status
-    document.status = DocumentStatus.PROCESSED
+    document.status = "processed"
     document.processed_at = datetime.now(timezone.utc)
 
     db.commit()
@@ -380,7 +381,7 @@ async def reject_document(
         )
 
     # Check if already processed/rejected
-    if document.status != DocumentStatus.PENDING:
+    if document.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Document already {document.status.value}"
@@ -392,7 +393,7 @@ async def reject_document(
         logger.warning(f"Failed to delete document file: {document.pdf_url}")
 
     # Update document status
-    document.status = DocumentStatus.REJECTED
+    document.status = "rejected"
     document.processed_at = datetime.now(timezone.utc)
     db.commit()
 
