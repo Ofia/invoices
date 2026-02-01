@@ -20,7 +20,7 @@ Endpoints:
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
@@ -31,7 +31,11 @@ from app.api.schemas import PendingDocumentResponse
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.pending_document import PendingDocument, DocumentStatus
-from app.utils.storage import save_document_file, delete_document_file
+from app.models.supplier import Supplier
+from app.models.invoice import Invoice
+from app.utils.storage import save_document_file, delete_document_file, get_document_full_path
+from app.utils.document_parser import extract_text_from_document
+from app.services.ai_extraction import extract_invoice_data, validate_extracted_data
 from pydantic import BaseModel
 from pathlib import Path
 
@@ -206,15 +210,12 @@ async def process_document(
     db: Session = Depends(get_db)
 ):
     """
-    Process a pending document into an invoice.
+    Process a pending document into an invoice using AI extraction.
 
-    This is a PLACEHOLDER for Phase 4 (AI integration).
-    Currently returns mock data - will be replaced with actual AI extraction.
-
-    Business Logic (Phase 4 - TODO):
-    1. Extract text from PDF
-    2. Send to Anthropic API for invoice data extraction
-    3. Match supplier by email from extraction
+    Business Logic:
+    1. Extract text from document (PDF/image)
+    2. Send to Claude AI for data extraction
+    3. Match supplier by email
     4. Calculate markup_total = original_total * (1 + markup_percentage)
     5. Create Invoice record
     6. Update document status to "processed"
@@ -227,7 +228,8 @@ async def process_document(
 
     Raises:
         404: Document not found or not owned by user
-        400: Document already processed or rejected
+        400: Document already processed, rejected, or processing failed
+        500: Text extraction or AI processing failed
 
     Example:
         POST /documents/5/process
@@ -252,30 +254,95 @@ async def process_document(
             detail=f"Document already {document.status.value}"
         )
 
-    # TODO: Phase 4 - AI Integration
-    # This is where we'll:
-    # 1. Extract PDF text (PyPDF2/pdfplumber)
-    # 2. Call Anthropic API for data extraction
-    # 3. Match supplier by email
-    # 4. Create invoice with calculated markup
+    # Step 1: Extract text from document
+    try:
+        file_path = get_document_full_path(document.pdf_url)
+        logger.info(f"Extracting text from: {file_path}")
 
-    # PLACEHOLDER: Return mock response for now
-    logger.warning(
-        f"Document {document_id} processing is stubbed - "
-        "Phase 4 AI integration required"
+        document_text = extract_text_from_document(file_path)
+
+        if not document_text or len(document_text.strip()) < 10:
+            raise Exception("Insufficient text extracted from document")
+
+        logger.info(f"Extracted {len(document_text)} characters from document")
+
+    except Exception as e:
+        logger.error(f"Text extraction failed for document {document_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract text from document: {str(e)}"
+        )
+
+    # Step 2: Extract invoice data using AI
+    try:
+        extracted_data = await extract_invoice_data(document_text)
+        logger.info(f"AI extracted data: {extracted_data}")
+
+    except Exception as e:
+        logger.error(f"AI extraction failed for document {document_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"AI extraction failed: {str(e)}"
+        )
+
+    # Step 3: Validate extracted data
+    is_valid, error_message = validate_extracted_data(extracted_data)
+    if not is_valid:
+        logger.error(f"Validation failed: {error_message}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid extracted data: {error_message}"
+        )
+
+    # Step 4: Match supplier by email
+    supplier_email = extracted_data["supplier_email"]
+    supplier = db.query(Supplier).filter(
+        Supplier.workspace_id == document.workspace_id,
+        Supplier.email == supplier_email
+    ).first()
+
+    if not supplier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No supplier found with email: {supplier_email}. Please add supplier first."
+        )
+
+    # Step 5: Calculate markup
+    original_total = float(extracted_data["total_amount"])
+    markup_total = original_total * (1 + supplier.markup_percentage / 100)
+
+    logger.info(
+        f"Calculated markup: ${original_total:.2f} → ${markup_total:.2f} "
+        f"({supplier.markup_percentage}% markup)"
     )
 
-    # Update document status
-    document.status = DocumentStatus.PROCESSED
-    document.processed_at = datetime.utcnow()
-    db.commit()
+    # Step 6: Create Invoice
+    invoice = Invoice(
+        workspace_id=document.workspace_id,
+        supplier_id=supplier.id,
+        pdf_url=document.pdf_url,
+        original_total=original_total,
+        markup_total=markup_total,
+        invoice_date=extracted_data.get("invoice_date")
+    )
 
-    # Mock invoice ID (will be real invoice in Phase 4)
-    mock_invoice_id = 999
+    db.add(invoice)
+
+    # Step 7: Update document status
+    document.status = DocumentStatus.PROCESSED
+    document.processed_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(invoice)
+
+    logger.info(
+        f"User {current_user.id} processed document {document_id} → invoice {invoice.id} "
+        f"(${original_total:.2f} → ${markup_total:.2f})"
+    )
 
     return DocumentProcessResponse(
-        message="Document processing stubbed (Phase 4 TODO)",
-        invoice_id=mock_invoice_id
+        message="Document processed successfully",
+        invoice_id=invoice.id
     )
 
 
@@ -326,7 +393,7 @@ async def reject_document(
 
     # Update document status
     document.status = DocumentStatus.REJECTED
-    document.processed_at = datetime.utcnow()
+    document.processed_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info(
