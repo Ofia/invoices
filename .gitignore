@@ -75,3 +75,9 @@ tmp/
 
 # OS
 Thumbs.db
+
+# Development tracking (local only)
+PROGRESS.md
+todo.md
+SESSION_*.md
+TESTING_*.md
