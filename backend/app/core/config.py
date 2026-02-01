@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     GOOGLE_REDIRECT_URI: str
+    # OAuth scopes for Google services
+    GOOGLE_OAUTH_SCOPES: list[str] = [
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        # "https://www.googleapis.com/auth/gmail.readonly",  # For Phase 5: Gmail integration - will add back later
+    ]
 
     # Anthropic API
     ANTHROPIC_API_KEY: str
@@ -36,6 +43,8 @@ class Settings(BaseSettings):
     # App Settings
     ENVIRONMENT: str = "development"
     API_V1_PREFIX: str = "/api/v1"
+    FRONTEND_URL: str = "http://localhost:5173"  # Vite default port
+    BACKEND_URL: str = "http://localhost:8000"
 
 
 settings = Settings()

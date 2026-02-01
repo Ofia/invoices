@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.api.routes import auth
 
 app = FastAPI(
     title="Invoice Management API",
@@ -12,10 +13,17 @@ app = FastAPI(
     description="AI-powered invoice management system"
 )
 
+# Include routers
+app.include_router(auth.router)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite dev server
+    allow_origins=[
+        settings.FRONTEND_URL,  # Primary frontend URL from .env
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:3000",  # Alternative dev port
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
