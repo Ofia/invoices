@@ -33,8 +33,18 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    # Storage (S3 or Supabase)
-    STORAGE_TYPE: str = "s3"  # or 'supabase'
+    # Storage (local, s3, or supabase)
+    STORAGE_TYPE: str = "local"  # 'local', 's3', or 'supabase'
+    UPLOAD_DIR: str = "uploads"  # Local storage directory
+    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB in bytes
+    ALLOWED_EXTENSIONS: set[str] = {
+        # PDFs
+        ".pdf",
+        # Images
+        ".png", ".jpg", ".jpeg", ".webp",
+        # Documents
+        ".doc", ".docx"
+    }
     AWS_ACCESS_KEY_ID: Optional[str] = None
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_BUCKET_NAME: Optional[str] = None
