@@ -60,29 +60,71 @@
 - User creation/authentication verified
 - JWT token validation confirmed working
 
-## Phase 3: Core API Endpoints
-- [ ] Workspaces endpoints
-  - [ ] GET /workspaces - List user workspaces
-  - [ ] POST /workspaces - Create workspace
-- [ ] Suppliers endpoints
-  - [ ] POST /suppliers - Add single supplier
-  - [ ] GET /suppliers/{workspace} - List suppliers
-  - [ ] POST /suppliers/bulk - Import from CSV/Excel
-- [ ] Documents endpoints
-  - [ ] POST /documents/upload - Upload PDF
-  - [ ] GET /documents/{workspace} - List documents
-  - [ ] POST /documents/{id}/process - Process to invoice
-  - [ ] POST /documents/{id}/reject - Reject document
-- [ ] Invoices endpoints
-  - [ ] GET /invoices/{workspace} - List invoices with totals
+## Phase 3: Core API Endpoints ✅
+- [x] Workspaces endpoints
+  - [x] GET /workspaces - List user workspaces
+  - [x] POST /workspaces - Create workspace
+  - [x] PUT /workspaces/{id} - Update workspace
+  - [x] DELETE /workspaces/{id} - Delete with protection
+  - [x] GET /workspaces/{id} - Get workspace details
+- [x] Suppliers endpoints
+  - [x] POST /suppliers - Add single supplier
+  - [x] GET /suppliers?workspace_id={id} - List suppliers
+  - [x] GET /suppliers/{id} - Get supplier details
+  - [x] PUT /suppliers/{id} - Update supplier
+  - [x] DELETE /suppliers/{id} - Delete with cascade
+  - [x] GET /suppliers/{id}/invoices - Pre-delete download
+  - [ ] POST /suppliers/bulk - Import from CSV/Excel (future)
+- [x] Documents endpoints
+  - [x] POST /documents/upload - Upload PDF/images (10MB max)
+  - [x] GET /documents?workspace_id={id} - List documents
+  - [x] POST /documents/{id}/process - Process to invoice
+  - [x] POST /documents/{id}/reject - Reject document
+- [x] Invoices endpoints
+  - [x] GET /invoices?workspace_id={id} - List invoices with sorting
+  - [x] GET /invoices/{id} - Get invoice details
+  - [x] GET /invoices/{id}/download - Download PDF
 
-## Phase 4: Document Processing
-- [ ] Implement PDF text extraction (PyPDF2/pdfplumber)
-- [ ] Integrate Anthropic API for invoice parsing
-- [ ] Create invoice data extraction logic
-- [ ] Implement supplier matching algorithm
-- [ ] Add markup calculation logic
-- [ ] Set up S3 or Supabase Storage for PDFs
+### Completion Notes - 2026-02-01
+**STATUS:** ✅ Phase 3 Complete
+
+**Implementation:**
+- All CRUD endpoints functional
+- Workspace deletion protection (blocks if has data)
+- Supplier cascade delete with warnings
+- Multi-format document upload (PDF, PNG, JPG, JPEG, WEBP)
+- Local filesystem storage with UUID filenames
+- Invoice sorting (A-Z oldest first, Z-A newest first)
+
+## Phase 4: Document Processing ✅
+- [x] Implement PDF text extraction (PyPDF2/pdfplumber)
+- [x] Integrate Anthropic API for invoice parsing
+- [x] Create invoice data extraction logic
+- [x] Implement supplier matching algorithm
+- [x] Add markup calculation logic
+- [x] Set up local file storage for PDFs
+- [ ] Migrate to S3 or Supabase Storage (future)
+
+### Completion Notes - 2026-02-01
+**STATUS:** ✅ Phase 4 Complete
+
+**AI Integration:**
+- Claude Sonnet 4.5 API integration working
+- Extracts: supplier_email, invoice_date, total_amount
+- JSON parsing with markdown code block handling
+- Validation of extracted data
+
+**Processing Flow:**
+1. PDF text extraction (PyPDF2 primary, pdfplumber fallback)
+2. Claude AI structured extraction
+3. Supplier matching by email
+4. Automatic markup calculation
+5. Invoice creation
+
+**Tested:**
+- Test invoice: $100 + $15 VAT = $115
+- 10% markup applied: $115 → $126.50
+- End-to-end processing verified ✓
 
 ## Phase 5: Gmail Integration
 - [ ] Set up Gmail API credentials
@@ -145,5 +187,5 @@
 
 ---
 
-**Current Phase:** Phase 3: Core API Endpoints
+**Current Phase:** Phase 5: Gmail Integration
 **Last Updated:** 2026-02-01
