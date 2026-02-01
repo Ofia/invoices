@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.api.routes import auth, workspaces
+from app.api.routes import auth, workspaces, suppliers
 
 app = FastAPI(
     title="Invoice Management API",
@@ -16,6 +16,7 @@ app = FastAPI(
 # Include routers
 app.include_router(auth.router)
 app.include_router(workspaces.router)
+app.include_router(suppliers.router)
 
 # Configure CORS
 app.add_middleware(
