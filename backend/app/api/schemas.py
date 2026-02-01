@@ -27,6 +27,9 @@ class WorkspaceBase(BaseModel):
 class WorkspaceCreate(WorkspaceBase):
     pass
 
+class WorkspaceUpdate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+
 class WorkspaceResponse(WorkspaceBase):
     id: int
     user_id: int
