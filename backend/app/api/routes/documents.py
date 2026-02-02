@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.config import settings
 from app.api.dependencies import get_current_user
-from app.api.schemas import PendingDocumentResponse
+from app.api.schemas import PendingDocumentResponse, ManualInvoiceCreate, ProcessingError
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.pending_document import PendingDocument
@@ -290,9 +290,31 @@ async def process_document(
     is_valid, error_message = validate_extracted_data(extracted_data)
     if not is_valid:
         logger.error(f"Validation failed: {error_message}")
+
+        # Determine error type and missing fields
+        error_type = "validation_failed"
+        missing_fields = []
+
+        if "supplier_email" in error_message:
+            error_type = "missing_email"
+            missing_fields.append("supplier_email")
+        elif "total_amount" in error_message:
+            error_type = "missing_total"
+            missing_fields.append("total_amount")
+        elif "date" in error_message.lower():
+            error_type = "invalid_date"
+
+        # Create detailed error response
+        error_detail = ProcessingError(
+            detail=error_message,
+            error_type=error_type,
+            missing_fields=missing_fields if missing_fields else None,
+            suggestion="You can create this invoice manually using POST /documents/{id}/create-invoice-manual"
+        )
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid extracted data: {error_message}"
+            detail=error_detail.model_dump()
         )
 
     # Step 4: Match supplier by email
@@ -303,9 +325,14 @@ async def process_document(
     ).first()
 
     if not supplier:
+        error_detail = ProcessingError(
+            detail=f"No supplier found with email: {supplier_email}",
+            error_type="supplier_not_found",
+            suggestion=f"Add supplier with email '{supplier_email}' first, or create invoice manually using POST /documents/{document_id}/create-invoice-manual"
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No supplier found with email: {supplier_email}. Please add supplier first."
+            detail=error_detail.model_dump()
         )
 
     # Step 5: Calculate markup
@@ -403,3 +430,106 @@ async def reject_document(
     )
 
     return None
+
+
+@router.post("/{document_id}/create-invoice-manual", response_model=DocumentProcessResponse)
+async def create_invoice_manual(
+    document_id: int,
+    invoice_data: ManualInvoiceCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually create an invoice from a document when AI processing fails.
+
+    Use this endpoint when automatic AI extraction fails (e.g., missing supplier email,
+    invalid format, etc.) and you want to manually enter the invoice details.
+
+    Args:
+        document_id: ID of the pending document
+        invoice_data: Manual invoice details (supplier_id, original_total, invoice_date)
+
+    Returns:
+        Process confirmation with invoice ID
+
+    Raises:
+        404: Document not found, not owned by user, or supplier not found
+        400: Document already processed or rejected
+        400: Supplier doesn't belong to the same workspace
+
+    Example:
+        POST /documents/5/create-invoice-manual
+        {
+            "supplier_id": 3,
+            "original_total": 115.50,
+            "invoice_date": "2025-12-10"
+        }
+    """
+    # Fetch document and verify ownership via workspace
+    document = db.query(PendingDocument).join(Workspace).filter(
+        PendingDocument.id == document_id,
+        Workspace.user_id == current_user.id
+    ).first()
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+
+    # Check if already processed
+    if document.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Document already {document.status.value}"
+        )
+
+    # Verify supplier exists and belongs to the same workspace
+    supplier = db.query(Supplier).filter(
+        Supplier.id == invoice_data.supplier_id,
+        Supplier.workspace_id == document.workspace_id
+    ).first()
+
+    if not supplier:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Supplier not found in this workspace"
+        )
+
+    # Calculate markup using supplier's markup percentage
+    original_total = invoice_data.original_total
+    markup_total = original_total * (1 + supplier.markup_percentage / 100)
+
+    logger.info(
+        f"Manual invoice creation: ${original_total:.2f} → ${markup_total:.2f} "
+        f"({supplier.markup_percentage}% markup)"
+    )
+
+    # Create Invoice
+    invoice = Invoice(
+        workspace_id=document.workspace_id,
+        supplier_id=supplier.id,
+        pdf_url=document.pdf_url,
+        original_total=original_total,
+        markup_total=markup_total,
+        invoice_date=invoice_data.invoice_date
+    )
+
+    db.add(invoice)
+
+    # Update document status to processed
+    document.status = "processed"
+    document.processed_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(invoice)
+
+    logger.info(
+        f"User {current_user.id} manually created invoice {invoice.id} from document {document_id} "
+        f"(${original_total:.2f} → ${markup_total:.2f})"
+    )
+
+    return DocumentProcessResponse(
+        message="Invoice created successfully (manual entry)",
+        invoice_id=invoice.id
+    )

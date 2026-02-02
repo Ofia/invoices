@@ -142,3 +142,18 @@ class TokenResponse(BaseModel):
 class GoogleAuthRequest(BaseModel):
     code: str
     redirect_uri: str
+
+
+# Manual Invoice Creation Schema
+class ManualInvoiceCreate(BaseModel):
+    supplier_id: int = Field(..., description="ID of the supplier for this invoice")
+    original_total: float = Field(..., gt=0, description="Original invoice total amount")
+    invoice_date: Optional[date] = Field(None, description="Invoice date (YYYY-MM-DD)")
+
+
+# Error Response Schema
+class ProcessingError(BaseModel):
+    detail: str = Field(..., description="Human-readable error message")
+    error_type: str = Field(..., description="Error type code (e.g., missing_email, missing_total)")
+    missing_fields: Optional[list[str]] = Field(None, description="List of missing required fields")
+    suggestion: Optional[str] = Field(None, description="Suggested action to resolve the error")

@@ -10,7 +10,8 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     google_id = Column(String(255), unique=True, nullable=False, index=True)
-    oauth_token = Column(Text, nullable=True)  # Encrypted OAuth token
+    oauth_token = Column(Text, nullable=True)  # OAuth access token (short-lived)
+    refresh_token = Column(Text, nullable=True)  # OAuth refresh token (long-lived, for Gmail access)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

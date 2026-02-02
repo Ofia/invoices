@@ -22,7 +22,7 @@ class Settings(BaseSettings):
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
-        # "https://www.googleapis.com/auth/gmail.readonly",  # For Phase 5: Gmail integration - will add back later
+        "https://www.googleapis.com/auth/gmail.readonly",  # Phase 5: Gmail integration for invoice detection
     ]
 
     # Anthropic API

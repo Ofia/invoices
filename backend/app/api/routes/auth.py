@@ -110,7 +110,8 @@ async def google_callback(
             db=db,
             google_id=user_info['google_id'],
             email=user_info['email'],
-            oauth_token=user_info.get('oauth_token')
+            oauth_token=user_info.get('access_token'),
+            refresh_token=user_info.get('refresh_token')
         )
 
         # Generate JWT access token for our application

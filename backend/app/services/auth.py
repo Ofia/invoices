@@ -148,6 +148,12 @@ async def exchange_code_for_token(code: str) -> Dict[str, Any]:
         userinfo_response.raise_for_status()
         user_info = userinfo_response.json()
 
+        # Log if refresh token was received
+        if refresh_token:
+            logger.info("Refresh token received from Google")
+        else:
+            logger.info("No refresh token received (user may have already authorized)")
+
         # Return combined user info and tokens
         return {
             "email": user_info.get("email"),
@@ -163,21 +169,23 @@ def get_or_create_user(
     db: Session,
     google_id: str,
     email: str,
-    oauth_token: Optional[str] = None
+    oauth_token: Optional[str] = None,
+    refresh_token: Optional[str] = None
 ) -> User:
     """
     Get existing user or create a new one based on Google authentication.
 
     This function:
     1. Searches for user by Google ID
-    2. If found: updates email and OAuth token
+    2. If found: updates email, OAuth token, and refresh token (if provided)
     3. If not found: creates new user
 
     Args:
         db: Database session
         google_id: Google's unique user identifier
         email: User's email from Google
-        oauth_token: Optional OAuth access token for Gmail API access
+        oauth_token: Optional OAuth access token (short-lived)
+        refresh_token: Optional OAuth refresh token (long-lived, for Gmail API)
 
     Returns:
         User object from database
@@ -191,10 +199,15 @@ def get_or_create_user(
     user = db.query(User).filter(User.google_id == google_id).first()
 
     if user:
-        # User exists - update email and OAuth token if changed
+        # User exists - update email and tokens if changed
         user.email = email
         if oauth_token:
             user.oauth_token = oauth_token
+        if refresh_token:
+            # Only update refresh token if a new one is provided
+            # (Google doesn't always send refresh tokens on subsequent logins)
+            user.refresh_token = refresh_token
+            logger.info(f"Updated refresh token for user {user.id}")
         db.commit()
         db.refresh(user)
     else:
@@ -202,10 +215,12 @@ def get_or_create_user(
         user = User(
             email=email,
             google_id=google_id,
-            oauth_token=oauth_token
+            oauth_token=oauth_token,
+            refresh_token=refresh_token
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+        logger.info(f"Created new user {user.id} with email {email}")
 
     return user
