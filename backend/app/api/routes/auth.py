@@ -123,17 +123,11 @@ async def google_callback(
             }
         )
 
-        # Return token and user info
-        return TokenResponse(
-            access_token=access_token,
-            token_type="bearer",
-            user=UserResponse(
-                id=user.id,
-                email=user.email,
-                google_id=user.google_id,
-                created_at=user.created_at
-            )
-        )
+        # Redirect to frontend with token in URL
+        frontend_url = settings.FRONTEND_URL or "http://localhost:5173"
+        redirect_url = f"{frontend_url}/login?token={access_token}"
+
+        return RedirectResponse(url=redirect_url, status_code=302)
 
     except httpx.TimeoutException as e:
         logger.error(f"Google OAuth timeout: {str(e)}")
