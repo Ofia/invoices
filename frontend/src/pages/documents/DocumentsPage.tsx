@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Loader2, AlertCircle, Mail, X } from 'lucide-react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { documents } from '../../lib/api';
+import { documents, gmail } from '../../lib/api';
 import type { PendingDocument } from '../../lib/api/types';
 
 export default function DocumentsPage() {
@@ -11,6 +11,10 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pendingDocuments, setPendingDocuments] = useState<PendingDocument[]>([]);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [selectedDays, setSelectedDays] = useState(7);
+  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch documents when workspace changes
@@ -116,6 +120,33 @@ export default function DocumentsPage() {
     }
   };
 
+  const handleGmailSync = async () => {
+    if (!currentWorkspace) return;
+
+    try {
+      setSyncing(true);
+      setError(null);
+      setSyncSuccess(null);
+
+      const result = await gmail.sync(currentWorkspace.id, selectedDays);
+
+      setSyncSuccess(
+        `Synced successfully! ${result.documents_created} new documents created from ${result.invoices_detected} invoice emails. ${result.duplicates_skipped} duplicates skipped.`
+      );
+
+      // Close modal and refresh documents
+      setShowSyncModal(false);
+      await fetchDocuments();
+    } catch (err: any) {
+      console.error('Gmail sync failed:', err);
+      const errorData = err.response?.data;
+      setError(errorData?.detail || 'Gmail sync failed');
+      setShowSyncModal(false);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const openFileBrowser = () => {
     fileInputRef.current?.click();
   };
@@ -144,12 +175,26 @@ export default function DocumentsPage() {
             Upload and process invoice documents
           </p>
         </div>
+        <button
+          onClick={() => setShowSyncModal(true)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          <Mail className="w-4 h-4" />
+          Sync Gmail
+        </button>
       </div>
 
       {/* Error Message */}
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl animate-slide-down">
           <p className="text-sm text-red-800">{error}</p>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {syncSuccess && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-xl animate-slide-down">
+          <p className="text-sm text-green-800">{syncSuccess}</p>
         </div>
       )}
 
@@ -290,6 +335,97 @@ export default function DocumentsPage() {
         )}
       </div>
 
+      {/* Gmail Sync Modal */}
+      {showSyncModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 animate-slide-up">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Sync Gmail</h3>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Select how many days back to search for invoice emails:
+              </p>
+
+              {/* Date Range Options */}
+              <div className="space-y-2 mb-6">
+                {[
+                  { value: 7, label: 'Last 7 days (Recommended)' },
+                  { value: 30, label: 'Last 30 days' },
+                  { value: 60, label: 'Last 60 days' },
+                  { value: 90, label: 'Last 90 days (Maximum)' },
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
+                      selectedDays === option.value
+                        ? 'border-gray-900 bg-gray-50'
+                        : 'border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="days"
+                      value={option.value}
+                      checked={selectedDays === option.value}
+                      onChange={(e) => setSelectedDays(Number(e.target.value))}
+                      className="mr-3"
+                    />
+                    <span className="text-sm text-gray-900">{option.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Info Text */}
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-6">
+                <p className="text-xs text-blue-800">
+                  <strong>Note:</strong> This will search your Gmail for emails with PDF
+                  attachments that match your suppliers or contain invoice keywords. All
+                  detected documents will require manual review before becoming invoices.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSyncModal(false)}
+                  disabled={syncing}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-900 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGmailSync}
+                  disabled={syncing}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" />
+                      Sync
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Animation styles */}
       <style>{`
         @keyframes slide-down {
@@ -303,8 +439,23 @@ export default function DocumentsPage() {
           }
         }
 
+        @keyframes slide-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
         .animate-slide-down {
           animation: slide-down 0.3s ease-out;
+        }
+
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
         }
       `}</style>
     </div>
