@@ -66,14 +66,11 @@ export default function Layout({ children }: LayoutProps) {
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSearching(true);
-        console.log('Searching for:', searchQuery, 'in workspace:', currentWorkspace.id);
         const results = await search.query(searchQuery, currentWorkspace.id);
-        console.log('Search results:', results);
         setSearchResults(results);
         setShowResults(true);
       } catch (err) {
         console.error('Search failed:', err);
-        console.error('Error details:', err);
         setSearchResults(null);
       } finally {
         setIsSearching(false);
