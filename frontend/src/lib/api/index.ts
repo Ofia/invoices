@@ -13,6 +13,7 @@ import type {
   CreateManualInvoiceRequest,
   GmailSyncResponse,
   GmailStatusResponse,
+  SearchResponse,
 } from './types';
 
 /**
@@ -283,6 +284,22 @@ export const gmail = {
   },
 };
 
+// ============================================================================
+// Search
+// ============================================================================
+
+export const search = {
+  /**
+   * Global search across invoices, suppliers, and documents
+   */
+  query: async (q: string, workspaceId: number): Promise<SearchResponse> => {
+    const response = await apiClient.get<SearchResponse>('/search', {
+      params: { q, workspace_id: workspaceId },
+    });
+    return response.data;
+  },
+};
+
 // Export all as a single object (alternative usage pattern)
 const api = {
   auth,
@@ -291,6 +308,7 @@ const api = {
   documents,
   invoices,
   gmail,
+  search,
 };
 
 export default api;
