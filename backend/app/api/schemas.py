@@ -157,3 +157,17 @@ class ProcessingError(BaseModel):
     error_type: str = Field(..., description="Error type code (e.g., missing_email, missing_total)")
     missing_fields: Optional[list[str]] = Field(None, description="List of missing required fields")
     suggestion: Optional[str] = Field(None, description="Suggested action to resolve the error")
+
+
+# Consolidated Invoice Schemas
+class ConsolidatedInvoiceRequest(BaseModel):
+    start_date: date = Field(..., description="Start date of billing period (YYYY-MM-DD)")
+    end_date: date = Field(..., description="End date of billing period (YYYY-MM-DD)")
+
+class ConsolidatedInvoicePreview(BaseModel):
+    invoice_count: int = Field(..., description="Number of invoices in the period")
+    total_original: float = Field(..., description="Sum of all original invoice amounts")
+    total_markup: float = Field(..., description="Total markup earned")
+    total_billed: float = Field(..., description="Total amount to bill (with markup)")
+    start_date: date = Field(..., description="Start date of billing period")
+    end_date: date = Field(..., description="End date of billing period")

@@ -9,20 +9,27 @@ Endpoints:
 - POST /workspaces - Create new workspace
 - PUT /workspaces/{id} - Update workspace name
 - DELETE /workspaces/{id} - Delete workspace (blocked if has data)
+- POST /workspaces/{id}/preview-consolidated-invoice - Preview consolidated invoice stats
+- POST /workspaces/{id}/generate-consolidated-invoice - Generate consolidated invoice PDF
 """
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.core.database import get_db
 from app.api.dependencies import get_current_user
-from app.api.schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse
+from app.api.schemas import (
+    WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse,
+    ConsolidatedInvoiceRequest, ConsolidatedInvoicePreview
+)
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.supplier import Supplier
 from app.models.invoice import Invoice
+from app.services.pdf_generator import generate_consolidated_invoice_pdf, ConsolidatedInvoiceData
 
 logger = logging.getLogger(__name__)
 
@@ -221,3 +228,203 @@ async def delete_workspace(
     logger.info(f"User {current_user.id} deleted workspace {workspace_id}")
 
     return None
+
+
+@router.post("/{workspace_id}/preview-consolidated-invoice", response_model=ConsolidatedInvoicePreview)
+async def preview_consolidated_invoice(
+    workspace_id: int,
+    request_data: ConsolidatedInvoiceRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Preview consolidated invoice statistics for a date range.
+
+    Shows a summary of what will be included in the consolidated invoice
+    without generating the PDF. Useful for frontend to display before user
+    confirms the generation.
+
+    Args:
+        workspace_id: ID of the workspace
+        request_data: Date range (start_date, end_date)
+
+    Returns:
+        ConsolidatedInvoicePreview with invoice count and totals
+
+    Raises:
+        404: Workspace not found or not owned by user
+        400: Invalid date range (end_date before start_date)
+
+    Example Request:
+        POST /workspaces/1/preview-consolidated-invoice
+        {
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31"
+        }
+
+    Example Response:
+        {
+            "invoice_count": 5,
+            "total_original": 1000.00,
+            "total_markup": 150.00,
+            "total_billed": 1150.00,
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31"
+        }
+    """
+    # Validate workspace ownership
+    workspace = db.query(Workspace).filter(
+        Workspace.id == workspace_id,
+        Workspace.user_id == current_user.id
+    ).first()
+
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found"
+        )
+
+    # Validate date range
+    if request_data.end_date < request_data.start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="End date must be after start date"
+        )
+
+    # Fetch invoices in date range
+    invoices = db.query(Invoice).filter(
+        Invoice.workspace_id == workspace_id,
+        Invoice.invoice_date >= request_data.start_date,
+        Invoice.invoice_date <= request_data.end_date
+    ).all()
+
+    # Calculate totals
+    invoice_count = len(invoices)
+    total_original = sum(inv.original_total for inv in invoices)
+    total_billed = sum(inv.markup_total for inv in invoices)
+    total_markup = total_billed - total_original
+
+    logger.info(
+        f"User {current_user.id} previewed consolidated invoice for workspace {workspace_id}: "
+        f"{invoice_count} invoices, ${total_billed:.2f} total"
+    )
+
+    return ConsolidatedInvoicePreview(
+        invoice_count=invoice_count,
+        total_original=total_original,
+        total_markup=total_markup,
+        total_billed=total_billed,
+        start_date=request_data.start_date,
+        end_date=request_data.end_date
+    )
+
+
+@router.post("/{workspace_id}/generate-consolidated-invoice")
+async def generate_consolidated_invoice(
+    workspace_id: int,
+    request_data: ConsolidatedInvoiceRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate and download a consolidated invoice PDF.
+
+    Creates a professional PDF invoice for property owners showing all
+    services (invoices) provided during the specified period with final
+    amounts to be paid (including markup).
+
+    Args:
+        workspace_id: ID of the workspace (property)
+        request_data: Date range (start_date, end_date)
+
+    Returns:
+        PDF file download (application/pdf)
+
+    Raises:
+        404: Workspace not found or not owned by user
+        400: Invalid date range or no invoices found in period
+
+    Example Request:
+        POST /workspaces/1/generate-consolidated-invoice
+        {
+            "start_date": "2026-01-01",
+            "end_date": "2026-01-31"
+        }
+
+    Returns:
+        PDF file with name: "consolidated_invoice_WORKSPACE_YYYYMMDD-YYYYMMDD.pdf"
+    """
+    # Validate workspace ownership
+    workspace = db.query(Workspace).filter(
+        Workspace.id == workspace_id,
+        Workspace.user_id == current_user.id
+    ).first()
+
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found"
+        )
+
+    # Validate date range
+    if request_data.end_date < request_data.start_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="End date must be after start date"
+        )
+
+    # Fetch invoices with supplier information in date range
+    invoices = db.query(Invoice).filter(
+        Invoice.workspace_id == workspace_id,
+        Invoice.invoice_date >= request_data.start_date,
+        Invoice.invoice_date <= request_data.end_date
+    ).order_by(Invoice.invoice_date.asc()).all()
+
+    # Check if there are any invoices
+    if not invoices:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No invoices found in workspace for the period "
+                   f"{request_data.start_date} to {request_data.end_date}"
+        )
+
+    # Prepare invoice items for PDF generation
+    invoice_items = []
+    for invoice in invoices:
+        invoice_items.append({
+            'supplier_name': invoice.supplier.name,
+            'invoice_date': invoice.invoice_date,
+            'amount': invoice.markup_total  # Only show final amount (with markup)
+        })
+
+    # Create consolidated invoice data
+    consolidated_data = ConsolidatedInvoiceData(
+        workspace_name=workspace.name,
+        start_date=request_data.start_date,
+        end_date=request_data.end_date,
+        invoice_items=invoice_items
+    )
+
+    # Generate PDF
+    pdf_buffer = generate_consolidated_invoice_pdf(consolidated_data)
+
+    # Generate filename
+    filename = (
+        f"consolidated_invoice_{workspace.name.replace(' ', '_')}_"
+        f"{request_data.start_date.strftime('%Y%m%d')}-"
+        f"{request_data.end_date.strftime('%Y%m%d')}.pdf"
+    )
+
+    logger.info(
+        f"User {current_user.id} generated consolidated invoice for workspace {workspace_id}: "
+        f"{len(invoices)} invoices, total ${consolidated_data.calculate_total():.2f}"
+    )
+
+    # Return PDF as streaming response
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
