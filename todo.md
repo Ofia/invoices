@@ -242,30 +242,42 @@
 - [ ] Configure production database
 - [ ] Set up CI/CD pipeline (optional)
 
-## Phase 10: Property Manager Invoice Consolidation
-- [ ] Backend: Create consolidated invoice endpoint
-  - [ ] POST /workspaces/{id}/generate-consolidated-invoice
-  - [ ] Parameters: start_date, end_date
-  - [ ] Logic:
-    - [ ] Fetch all invoices in workspace within date range
-    - [ ] Sum all markup_total values
-    - [ ] Generate line items per supplier
-    - [ ] Create PDF with itemized breakdown
-    - [ ] Include: Property name, date range, supplier list, totals
-  - [ ] Return: PDF download + invoice summary
-- [ ] Frontend: Add "Generate Invoice" feature
-  - [ ] Add button on Invoices page
-  - [ ] Date range picker modal
-  - [ ] Preview: Show which invoices will be included
-  - [ ] Display summary: Total original, total markup, total billing
-  - [ ] Download consolidated PDF invoice
-- [ ] Invoice Template:
-  - [ ] Professional PDF layout
-  - [ ] Header: Property Manager info, Property name
-  - [ ] Date range covered
-  - [ ] Table: Supplier | Original Amount | Markup % | Billed Amount
-  - [ ] Subtotals and Grand Total
-  - [ ] Footer: Invoice number, date generated
+## Phase 10: Property Manager Invoice Consolidation ✅
+- [x] Backend: Create consolidated invoice endpoint
+  - [x] POST /workspaces/{id}/preview-consolidated-invoice (preview stats)
+  - [x] POST /workspaces/{id}/generate-consolidated-invoice (generate PDF)
+  - [x] Parameters: start_date, end_date
+  - [x] Logic:
+    - [x] Fetch all invoices in workspace within date range
+    - [x] Calculate totals (original, markup, billed)
+    - [x] Generate line items per supplier
+    - [x] Create PDF with itemized breakdown
+    - [x] Include: Property name, date range, supplier list, totals
+  - [x] Return: PDF download
+- [x] Frontend: Add "Generate Invoice" feature
+  - [x] Add button on Invoices page
+  - [x] Date range picker modal
+  - [x] Preview: Show invoice count and totals
+  - [x] Display summary: Total original, total markup, total billing
+  - [x] Download consolidated PDF invoice
+- [x] Invoice Template:
+  - [x] Professional PDF layout with ReportLab
+  - [x] Header: Invoice number, date, property name
+  - [x] Date range covered (billing period)
+  - [x] Table: Service Provider | Date | Amount (markup_total only)
+  - [x] Grand Total
+  - [x] Footer: Payment terms and invoice details
+
+### Completion Notes - 2026-02-10
+**STATUS:** ✅ Phase 10 Complete
+
+**Implementation:**
+- ReportLab PDF generation with professional styling
+- Two endpoints: preview (stats) and generate (PDF download)
+- Customer-facing invoice shows only final amounts (no markup breakdown)
+- Modal with date picker and preview functionality
+- Real-time preview shows invoice count and totals before generating
+- Clean, professional PDF suitable for billing property owners
 
 **Use Case:**
 Property manager oversees a property (workspace). Multiple suppliers provide services (invoices). Manager needs to bill the property owner with all marked-up costs consolidated into one master invoice for a specific period (e.g., monthly billing).
@@ -281,5 +293,5 @@ Property manager oversees a property (workspace). Multiple suppliers provide ser
 
 ---
 
-**Current Phase:** Phase 7 Complete - Ready for Testing & Deployment
-**Last Updated:** 2026-02-05
+**Current Phase:** Phase 10 Complete - Ready for Deployment
+**Last Updated:** 2026-02-10
