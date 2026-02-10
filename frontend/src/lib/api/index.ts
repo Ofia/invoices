@@ -14,6 +14,8 @@ import type {
   GmailSyncResponse,
   GmailStatusResponse,
   SearchResponse,
+  ConsolidatedInvoiceRequest,
+  ConsolidatedInvoicePreview,
 } from './types';
 
 /**
@@ -95,6 +97,39 @@ export const workspaces = {
    */
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/workspaces/${id}`);
+  },
+
+  /**
+   * Preview consolidated invoice for a date range
+   * Returns statistics about invoices that would be included
+   */
+  previewConsolidatedInvoice: async (
+    workspaceId: number,
+    startDate: string,
+    endDate: string
+  ): Promise<ConsolidatedInvoicePreview> => {
+    const response = await apiClient.post<ConsolidatedInvoicePreview>(
+      `/workspaces/${workspaceId}/preview-consolidated-invoice`,
+      { start_date: startDate, end_date: endDate }
+    );
+    return response.data;
+  },
+
+  /**
+   * Generate and download consolidated invoice PDF
+   * Returns a Blob that can be used to download the PDF
+   */
+  generateConsolidatedInvoice: async (
+    workspaceId: number,
+    startDate: string,
+    endDate: string
+  ): Promise<Blob> => {
+    const response = await apiClient.post(
+      `/workspaces/${workspaceId}/generate-consolidated-invoice`,
+      { start_date: startDate, end_date: endDate },
+      { responseType: 'blob' }
+    );
+    return new Blob([response.data], { type: 'application/pdf' });
   },
 };
 

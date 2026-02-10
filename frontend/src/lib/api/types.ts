@@ -142,3 +142,18 @@ export interface ApiError {
   missing_fields?: string[];
   suggestion?: string;
 }
+
+// Consolidated Invoice types
+export interface ConsolidatedInvoiceRequest {
+  start_date: string;
+  end_date: string;
+}
+
+export interface ConsolidatedInvoicePreview {
+  invoice_count: number;
+  total_original: number;
+  total_markup: number;
+  total_billed: number;
+  start_date: string;
+  end_date: string;
+}
