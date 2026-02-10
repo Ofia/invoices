@@ -235,12 +235,47 @@
 - [ ] Implement loading states
 - [ ] Add user feedback (toasts/notifications)
 
-## Phase 9: Deployment Prep
-- [ ] Create Docker configuration
-- [ ] Set up environment variables
-- [ ] Write deployment documentation
-- [ ] Configure production database
-- [ ] Set up CI/CD pipeline (optional)
+## Phase 9: Deployment (Free Tier - CV/Portfolio Project)
+
+**Deployment Strategy Decision:**
+- **Frontend:** AWS S3 + CloudFront (static hosting)
+- **Backend:** Railway.app or Render.com (free tier, managed)
+- **Database:** Supabase (free tier, managed PostgreSQL)
+- **Reason:** Easiest setup, free tier available, perfect for portfolio/CV projects
+
+### Frontend Deployment (S3 + CloudFront)
+- [ ] Build React app for production (`npm run build`)
+- [ ] Create AWS S3 bucket for static hosting
+- [ ] Configure S3 bucket for website hosting
+- [ ] Upload build files to S3
+- [ ] Set up CloudFront distribution (optional, for HTTPS)
+- [ ] Configure custom domain (optional)
+
+### Backend Deployment (Railway/Render)
+- [ ] Create Procfile or railway.toml
+- [ ] Set up environment variables in platform
+- [ ] Connect GitHub repository
+- [ ] Deploy backend to Railway/Render
+- [ ] Get backend URL and test endpoints
+
+### Database Migration (Supabase)
+- [ ] Create Supabase project
+- [ ] Get PostgreSQL connection string
+- [ ] Run Alembic migrations on Supabase DB
+- [ ] Update backend DATABASE_URL env variable
+- [ ] Test database connectivity
+
+### Configuration & Testing
+- [ ] Update frontend API_URL to point to deployed backend
+- [ ] Configure CORS for production domain
+- [ ] Set up Google OAuth redirect URIs for production
+- [ ] Test full application flow end-to-end
+- [ ] Write deployment documentation (README)
+
+### Post-Deployment
+- [ ] Monitor application logs
+- [ ] Set up error tracking (optional: Sentry)
+- [ ] Document deployment process for future updates
 
 ## Phase 10: Property Manager Invoice Consolidation ✅
 - [x] Backend: Create consolidated invoice endpoint
