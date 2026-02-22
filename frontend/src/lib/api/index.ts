@@ -14,7 +14,6 @@ import type {
   GmailSyncResponse,
   GmailStatusResponse,
   SearchResponse,
-  ConsolidatedInvoiceRequest,
   ConsolidatedInvoicePreview,
 } from './types';
 

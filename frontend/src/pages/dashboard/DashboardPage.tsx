@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Loader2, FileText, Download, ChevronDown } from 'lucide-react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { invoices, documents, suppliers } from '../../lib/api';
-import type { Invoice, PendingDocument, Supplier } from '../../lib/api/types';
+import type { Invoice } from '../../lib/api/types';
 
 type Currency = 'EUR' | 'USD' | 'GBP';
 
