@@ -33,7 +33,7 @@ from app.models.workspace import Workspace
 from app.models.pending_document import PendingDocument
 from app.models.supplier import Supplier
 from app.models.invoice import Invoice
-from app.utils.storage import save_document_file, delete_document_file, get_document_full_path
+from app.utils.storage import save_document_file, delete_document_file, get_document_for_processing
 from app.utils.document_parser import extract_text_from_document
 from app.services.ai_extraction import extract_invoice_data, validate_extracted_data
 from pydantic import BaseModel
@@ -256,10 +256,10 @@ async def process_document(
 
     # Step 1: Extract text from document
     try:
-        file_path = get_document_full_path(document.pdf_url)
-        logger.info(f"Extracting text from: {file_path}")
+        logger.info(f"Extracting text from: {document.pdf_url}")
 
-        document_text = extract_text_from_document(file_path)
+        with get_document_for_processing(document.pdf_url) as file_path:
+            document_text = extract_text_from_document(file_path)
 
         if not document_text or len(document_text.strip()) < 10:
             raise Exception("Insufficient text extracted from document")
