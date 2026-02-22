@@ -81,3 +81,6 @@ PROGRESS.md
 todo.md
 SESSION_*.md
 TESTING_*.md
+
+# Local deployment reference (contains live credentials — never push)
+deployment.md
