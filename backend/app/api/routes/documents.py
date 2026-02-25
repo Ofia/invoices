@@ -205,7 +205,7 @@ async def list_documents(
 @router.post("/{document_id}/process", response_model=DocumentProcessResponse)
 async def process_document(
     document_id: int,
-    process_data: DocumentProcessRequest,
+    process_data: DocumentProcessRequest = DocumentProcessRequest(),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

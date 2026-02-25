@@ -10,11 +10,12 @@ Flow:
 4. Return structured data for invoice creation
 """
 
+import asyncio
 import logging
 import json
 from typing import Optional, Dict, Any
 from datetime import date
-from anthropic import Anthropic
+from anthropic import Anthropic, APIStatusError
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -75,63 +76,58 @@ async def extract_invoice_data(document_text: str) -> Dict[str, Any]:
         >>> print(data)
         {"supplier_email": "billing@abc.com", "invoice_date": "2025-12-10", "total_amount": 100.00}
     """
-    try:
-        # Build prompt with invoice text
-        prompt = INVOICE_EXTRACTION_PROMPT.format(invoice_text=document_text)
+    max_retries = 3
+    prompt = INVOICE_EXTRACTION_PROMPT.format(invoice_text=document_text)
+    logger.info(f"Sending {len(document_text)} chars to Claude for extraction")
 
-        logger.info(f"Sending {len(document_text)} chars to Claude for extraction")
+    for attempt in range(max_retries):
+        try:
+            message = client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=1024,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}]
+            )
+        except APIStatusError as e:
+            if e.status_code == 529 and attempt < max_retries - 1:
+                wait = 2 ** attempt  # 1s, then 2s
+                logger.warning(f"Claude API overloaded (529), retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(wait)
+                continue
+            logger.error(f"AI extraction failed: {str(e)}")
+            raise Exception(f"Failed to extract invoice data: {str(e)}")
+        except Exception as e:
+            logger.error(f"AI extraction failed: {str(e)}")
+            raise Exception(f"Failed to extract invoice data: {str(e)}")
 
-        # Call Claude API
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",  # Claude Sonnet 4.5 (latest)
-            max_tokens=1024,
-            temperature=0,  # Deterministic output for data extraction
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        # Extract text response
+        # Parse JSON response
         response_text = message.content[0].text
         logger.info(f"Claude extraction response received ({len(response_text)} chars)")
 
-        # Parse JSON response
         try:
             data = json.loads(response_text)
         except json.JSONDecodeError:
-            # Sometimes Claude returns JSON in markdown code blocks
-            # Try to extract JSON from ```json ... ``` blocks
             if "```json" in response_text:
                 json_start = response_text.find("```json") + 7
                 json_end = response_text.find("```", json_start)
-                json_text = response_text[json_start:json_end].strip()
-                data = json.loads(json_text)
+                data = json.loads(response_text[json_start:json_end].strip())
             elif "```" in response_text:
-                # Plain ``` blocks
                 json_start = response_text.find("```") + 3
                 json_end = response_text.find("```", json_start)
-                json_text = response_text[json_start:json_end].strip()
-                data = json.loads(json_text)
+                data = json.loads(response_text[json_start:json_end].strip())
             else:
                 raise Exception(f"Could not parse JSON from response: {response_text}")
 
-        # Validate required fields
         if not isinstance(data, dict):
             raise Exception(f"Response is not a JSON object: {data}")
 
-        # Return extracted data
         return {
             "supplier_email": data.get("supplier_email"),
             "invoice_date": data.get("invoice_date"),
             "total_amount": data.get("total_amount")
         }
 
-    except Exception as e:
-        logger.error(f"AI extraction failed: {str(e)}")
-        raise Exception(f"Failed to extract invoice data: {str(e)}")
+    raise Exception("Failed to extract invoice data: max retries exceeded")
 
 
 def validate_extracted_data(data: Dict[str, Any]) -> tuple[bool, Optional[str]]:

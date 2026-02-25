@@ -15,6 +15,7 @@ export default function DocumentsPage() {
   const [syncing, setSyncing] = useState(false);
   const [selectedDays, setSelectedDays] = useState(7);
   const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch documents when workspace changes
@@ -93,17 +94,22 @@ export default function DocumentsPage() {
   const handleProcess = async (docId: number) => {
     try {
       setError(null);
+      setProcessingId(docId);
       await documents.process(docId);
       // Refresh list after processing
       await fetchDocuments();
     } catch (err: any) {
       console.error('Processing failed:', err);
-      const errorData = err.response?.data;
-      if (errorData?.error_type) {
-        setError(`${errorData.error_type}: ${errorData.detail}`);
+      const detail = err.response?.data?.detail;
+      if (detail && typeof detail === 'object') {
+        setError(detail.detail || detail.error_type || 'Processing failed');
+      } else if (typeof detail === 'string') {
+        setError(detail);
       } else {
         setError('Processing failed');
       }
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -309,13 +315,22 @@ export default function DocumentsPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleProcess(doc.id)}
-                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+                      disabled={processingId === doc.id}
+                      className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5"
                     >
-                      Process
+                      {processingId === doc.id ? (
+                        <>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        'Process'
+                      )}
                     </button>
                     <button
                       onClick={() => handleReject(doc.id)}
-                      className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-900 transition-colors"
+                      disabled={processingId === doc.id}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-900 transition-colors disabled:opacity-50"
                     >
                       Reject
                     </button>
